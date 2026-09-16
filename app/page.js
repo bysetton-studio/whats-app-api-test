@@ -81,9 +81,19 @@ export default function Home() {
     }
   }
 
+  async function handleLogout() {
+    await fetch("/api/auth", { method: "DELETE" });
+    window.location.href = "/login";
+  }
+
   return (
     <div style={styles.page}>
-      <h1 style={styles.h1}>WhatsApp API Tester</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
+        <h1 style={{ ...styles.h1, margin: 0 }}>WhatsApp API Tester</h1>
+        <button onClick={handleLogout} style={{ ...styles.button, background: "#333", color: "#999", padding: "4px 12px", fontSize: 12 }}>
+          Logout
+        </button>
+      </div>
 
       {/* ── Phone number status ── */}
       {phoneStatus && (

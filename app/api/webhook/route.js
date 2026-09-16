@@ -26,7 +26,7 @@ async function fetchRandomGif() {
       `https://api.giphy.com/v1/gifs/random?api_key=${apiKey}&rating=g`
     );
     const data = await res.json();
-    return data.data?.images?.original_mp4?.mp4 ?? null;
+    return data.data?.images?.original?.url ?? null;
   } catch (err) {
     console.warn("[webhook] Giphy fetch failed:", err.message);
     return null;
