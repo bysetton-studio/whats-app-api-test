@@ -1,18 +1,18 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 
 // Routes Meta and the public need — no auth required.
 const PUBLIC_PREFIXES = ["/api/webhook", "/api/auth", "/login", "/privacy"];
 
-function expectedToken() {
-  // Derive the session token from AUTH_PASSWORD so we only need one env var.
-  return crypto
-    .createHash("sha256")
-    .update((process.env.AUTH_PASSWORD ?? "") + "-session")
-    .digest("hex");
+async function expectedToken() {
+  // Web Crypto API — available in Edge runtime.
+  const encoded = new TextEncoder().encode((process.env.AUTH_PASSWORD ?? "") + "-session");
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoded);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
-export function middleware(request) {
+export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
   if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
@@ -20,7 +20,7 @@ export function middleware(request) {
   }
 
   const session = request.cookies.get("session")?.value;
-  if (!process.env.AUTH_PASSWORD || session !== expectedToken()) {
+  if (!process.env.AUTH_PASSWORD || session !== (await expectedToken())) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
