@@ -1,4 +1,4 @@
-import { getMessages } from "@/lib/redis";
+import { getMessages } from "@/lib/db";
 
 export async function GET() {
   const messages = await getMessages(50);

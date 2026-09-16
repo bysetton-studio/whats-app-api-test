@@ -2,15 +2,13 @@
 
 Minimal Next.js app for testing WhatsApp Cloud API webhook delivery and message sending. Designed for Vercel.
 
-## Storage: Upstash Redis
+## Storage: Neon (Postgres)
 
-Vercel serverless functions are stateless — an in-memory array disappears after each request. This tool uses **Upstash Redis** (free tier, no card required) via their REST API. Each incoming webhook message is pushed to a Redis list; the frontend polls `/api/messages` every 2.5 s to display them.
-
-> **Tradeoff vs. Vercel KV:** Vercel KV *is* Upstash under the hood but requires linking a storage resource to your Vercel project in the dashboard. Using Upstash directly is identical at runtime and works without that linking step — just two env vars.
+Vercel serverless functions are stateless — an in-memory array disappears after each request. This tool uses **Neon** (serverless Postgres) to persist incoming messages. The table is created automatically on first use (`CREATE TABLE IF NOT EXISTS`), so there's no manual migration step.
 
 ## Local development
 
-1. Copy `.env.local.example` to `.env.local` and fill in all values (see below for where to find each one).
+1. Fill in `.env.local` (see env var table below).
 2. Install deps and run:
    ```
    npm install
@@ -28,26 +26,31 @@ To test the webhook locally, use [ngrok](https://ngrok.com) or [Cloudflare Tunne
 | `PHONE_NUMBER_ID` | Meta App Dashboard → WhatsApp → API Setup → Phone Number ID |
 | `WEBHOOK_VERIFY_TOKEN` | Any string you choose — must match what you enter in Meta Webhooks config |
 | `APP_SECRET` | Meta App Dashboard → App Settings → Basic → App Secret |
-| `UPSTASH_REDIS_REST_URL` | [Upstash console](https://console.upstash.com) → your database → REST API → UPSTASH_REDIS_REST_URL |
-| `UPSTASH_REDIS_REST_TOKEN` | Same place → UPSTASH_REDIS_REST_TOKEN |
+| `POSTGRES_URL` | See below |
+
+### Getting POSTGRES_URL
+
+**On Vercel (recommended):** In your project dashboard → **Storage** → **Create Database** → select **Neon**. Vercel automatically injects `POSTGRES_URL` (and others) into your deployment environment — no manual copy-paste needed.
+
+**For local dev:** Go to [console.neon.tech](https://console.neon.tech), open your database → **Connection Details** → copy the **Connection string** (pooled). Paste it as `POSTGRES_URL` in `.env.local`.
 
 ## Deploy to Vercel
 
 1. Push this repo to GitHub (or any Git provider).
 2. Import it in the [Vercel dashboard](https://vercel.com/new) and deploy.
-3. In **Project Settings → Environment Variables**, add all six variables from the table above.
-4. Your webhook URL will be:
+3. In your project → **Storage** → **Create Database** → **Neon** — this auto-wires `POSTGRES_URL`.
+4. In **Project Settings → Environment Variables**, add the four WhatsApp vars (`ACCESS_TOKEN`, `PHONE_NUMBER_ID`, `WEBHOOK_VERIFY_TOKEN`, `APP_SECRET`).
+5. Your webhook URL will be:
    ```
    https://<your-project>.vercel.app/api/webhook
    ```
-5. In **Meta App Dashboard → WhatsApp → Configuration → Webhook**, paste that URL and your `WEBHOOK_VERIFY_TOKEN`. Click "Verify and Save". Meta will send a GET with `hub.challenge`; the app returns it and verification passes.
-6. Subscribe to the **messages** field under Webhook Fields.
+6. In **Meta App Dashboard → WhatsApp → Configuration → Webhook**, paste that URL and your `WEBHOOK_VERIFY_TOKEN`. Click "Verify and Save". Meta sends a GET with `hub.challenge`; the app returns it and verification passes.
+7. Subscribe to the **messages** field under Webhook Fields.
 
 Alternatively, deploy directly from the CLI:
 ```
 npx vercel
 ```
-Set env vars with `vercel env add` or in the dashboard after deployment.
 
 ## Errors are shown, not swallowed
 

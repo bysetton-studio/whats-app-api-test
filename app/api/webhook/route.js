@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { pushMessage } from "@/lib/redis";
+import { pushMessage } from "@/lib/db";
 
 // GET — Meta webhook verification handshake
 export async function GET(request) {
