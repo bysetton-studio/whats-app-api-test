@@ -80,9 +80,22 @@ export default function Home() {
         </form>
 
         {sendResult && (
-          <div style={styles.resultBox}>
-            <strong>Response from /api/send:</strong>
-            <pre style={styles.pre}>{JSON.stringify(sendResult, null, 2)}</pre>
+          <div style={{ ...styles.resultBox, borderColor: sendResult.body?.error ? "#f66" : "#4a4" }}>
+            {sendResult.body?.error ? (
+              <>
+                <strong style={{ color: "#f66" }}>
+                  Error {sendResult.body.error.code}
+                  {sendResult.body.error.error_subcode ? ` (${sendResult.body.error.error_subcode})` : ""}
+                  : {sendResult.body.error.message}
+                </strong>
+                <pre style={styles.pre}>{JSON.stringify(sendResult, null, 2)}</pre>
+              </>
+            ) : (
+              <>
+                <strong style={{ color: "#4a4" }}>Sent OK</strong>
+                <pre style={styles.pre}>{JSON.stringify(sendResult, null, 2)}</pre>
+              </>
+            )}
           </div>
         )}
       </section>
