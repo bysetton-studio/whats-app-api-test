@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from "react";
 
 export default function Home() {
   const [messages, setMessages] = useState([]);
+  const [selectedNumber, setSelectedNumber] = useState("__manual__");
   const [to, setTo] = useState("");
   const [text, setText] = useState("");
   const [sendResult, setSendResult] = useState(null);
@@ -10,6 +11,26 @@ export default function Home() {
   const [fetchError, setFetchError] = useState(null);
   const [phoneStatus, setPhoneStatus] = useState(null);
   const intervalRef = useRef(null);
+
+  // Numbers with an open 24-hour reply window, derived from stored messages.
+  const WINDOW_MS = 24 * 60 * 60 * 1000;
+  const activeWindows = Object.values(
+    messages.reduce((acc, msg) => {
+      const ts = Number(msg.receivedAt);
+      if (!acc[msg.from] || ts > acc[msg.from].lastTs) {
+        acc[msg.from] = { number: msg.from, lastTs: ts };
+      }
+      return acc;
+    }, {})
+  )
+    .filter(({ lastTs }) => Date.now() - lastTs < WINDOW_MS)
+    .sort((a, b) => b.lastTs - a.lastTs)
+    .map(({ number, lastTs }) => {
+      const msLeft = WINDOW_MS - (Date.now() - lastTs);
+      const hLeft = Math.floor(msLeft / 3600000);
+      const mLeft = Math.floor((msLeft % 3600000) / 60000);
+      return { number, label: `${number} — ${hLeft}h ${mLeft}m left` };
+    });
 
   async function fetchMessages() {
     try {
@@ -41,13 +62,15 @@ export default function Home() {
 
   async function handleSend(e) {
     e.preventDefault();
+    const recipient = selectedNumber !== "__manual__" ? selectedNumber : to;
+    if (!recipient) return;
     setSending(true);
     setSendResult(null);
     try {
       const res = await fetch("/api/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to, message: text }),
+        body: JSON.stringify({ to: recipient, message: text }),
       });
       const data = await res.json();
       setSendResult(data);
@@ -100,15 +123,39 @@ export default function Home() {
         <h2 style={styles.h2}>Send Message</h2>
         <form onSubmit={handleSend} style={styles.form}>
           <label style={styles.label}>
-            To (phone number with country code, no +)
-            <input
+            To
+            <select
               style={styles.input}
-              value={to}
-              onChange={(e) => setTo(e.target.value)}
-              placeholder="15551234567"
-              required
-            />
+              value={selectedNumber}
+              onChange={(e) => {
+                setSelectedNumber(e.target.value);
+                if (e.target.value !== "__manual__") setTo(e.target.value);
+                else setTo("");
+              }}
+            >
+              {activeWindows.length === 0 && (
+                <option value="__manual__">No open windows — enter manually</option>
+              )}
+              {activeWindows.map(({ number, label }) => (
+                <option key={number} value={number}>{label}</option>
+              ))}
+              {activeWindows.length > 0 && (
+                <option value="__manual__">Other (enter manually)</option>
+              )}
+            </select>
           </label>
+          {selectedNumber === "__manual__" && (
+            <label style={styles.label}>
+              Phone number (with country code, no +)
+              <input
+                style={styles.input}
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                placeholder="15551234567"
+                required
+              />
+            </label>
+          )}
           <label style={styles.label}>
             Message
             <textarea
