@@ -17,18 +17,25 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
-// Fetches a random GIF MP4 URL from Giphy. Returns null if unavailable.
+// Fetches a random GIF URL from Giphy. Returns null if unavailable.
 async function fetchRandomGif() {
   const apiKey = process.env.GIPHY_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.warn("[giphy] GIPHY_API_KEY not set — skipping GIF");
+    return null;
+  }
   try {
     const res = await fetch(
       `https://api.giphy.com/v1/gifs/random?api_key=${apiKey}&rating=g`
     );
+    console.log("[giphy] HTTP status:", res.status);
     const data = await res.json();
-    return data.data?.images?.original?.url ?? null;
+    console.log("[giphy] Full response:", JSON.stringify(data).slice(0, 500));
+    const url = data.data?.images?.original_mp4?.mp4 ?? data.data?.images?.original?.url ?? null;
+    console.log("[giphy] Resolved URL:", url);
+    return url;
   } catch (err) {
-    console.warn("[webhook] Giphy fetch failed:", err.message);
+    console.error("[giphy] Fetch threw:", err.message);
     return null;
   }
 }
@@ -39,15 +46,21 @@ async function sendReply(to) {
   const accessToken = process.env.ACCESS_TOKEN;
   if (!phoneNumberId || !accessToken) {
     const err = { message: "PHONE_NUMBER_ID or ACCESS_TOKEN not set" };
-    console.warn("[webhook] Cannot send reply —", err.message);
+    console.warn("[reply] Cannot send reply —", err.message);
     return err;
   }
 
-  const gifUrl = await fetchRandomGif();
+  let gifUrl;
+  try {
+    gifUrl = await fetchRandomGif();
+  } catch (err) {
+    console.error("[reply] fetchRandomGif threw unexpectedly:", err.message);
+    gifUrl = null;
+  }
 
   let payload;
   if (gifUrl) {
-    console.log("[webhook] Replying with GIF:", gifUrl);
+    console.log("[reply] Sending GIF to", to, "url:", gifUrl);
     payload = {
       messaging_product: "whatsapp",
       to,
@@ -55,7 +68,7 @@ async function sendReply(to) {
       video: { link: gifUrl },
     };
   } else {
-    console.log("[webhook] No GIF available, falling back to text reply");
+    console.log("[reply] No GIF — sending text fallback to", to);
     payload = {
       messaging_product: "whatsapp",
       to,
@@ -64,20 +77,30 @@ async function sendReply(to) {
     };
   }
 
-  const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
-  const data = await res.json();
+  console.log("[reply] Payload:", JSON.stringify(payload));
+
+  let res, data;
+  try {
+    res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+    data = await res.json();
+  } catch (err) {
+    console.error("[reply] fetch to Meta threw:", err.message);
+    return { message: err.message };
+  }
+
+  console.log("[reply] Meta HTTP status:", res.status, "body:", JSON.stringify(data));
   if (data.error) {
-    console.error("[webhook] Auto-reply failed — code:", data.error.code, "message:", data.error.message, "full:", JSON.stringify(data.error));
+    console.error("[reply] Auto-reply failed — code:", data.error.code, "subcode:", data.error.error_subcode, "message:", data.error.message);
     return data.error;
   }
-  console.log("[webhook] Auto-reply sent OK:", data);
+  console.log("[reply] Sent OK");
   return null;
 }
 
