@@ -8,6 +8,7 @@ export default function Home() {
   const [sendResult, setSendResult] = useState(null);
   const [sending, setSending] = useState(false);
   const [fetchError, setFetchError] = useState(null);
+  const [phoneStatus, setPhoneStatus] = useState(null);
   const intervalRef = useRef(null);
 
   async function fetchMessages() {
@@ -21,8 +22,19 @@ export default function Home() {
     }
   }
 
+  async function fetchStatus() {
+    try {
+      const res = await fetch("/api/status");
+      const data = await res.json();
+      setPhoneStatus(data);
+    } catch (e) {
+      setPhoneStatus({ error: e.message });
+    }
+  }
+
   useEffect(() => {
     fetchMessages();
+    fetchStatus();
     intervalRef.current = setInterval(fetchMessages, 2500);
     return () => clearInterval(intervalRef.current);
   }, []);
@@ -49,6 +61,39 @@ export default function Home() {
   return (
     <div style={styles.page}>
       <h1 style={styles.h1}>WhatsApp API Tester</h1>
+
+      {/* ── Phone number status ── */}
+      {phoneStatus && (
+        <section style={{ ...styles.card, marginBottom: 24 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <h2 style={{ ...styles.h2, margin: 0 }}>Phone Number Status</h2>
+            <button onClick={fetchStatus} style={{ ...styles.button, padding: "4px 12px", fontSize: 12 }}>
+              Refresh
+            </button>
+          </div>
+          {phoneStatus.error ? (
+            <span style={{ color: "#f66", fontSize: 13 }}>{JSON.stringify(phoneStatus.error)}</span>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, fontSize: 13 }}>
+              <div><span style={styles.label2}>Number:</span> {phoneStatus.display_phone_number ?? "—"}</div>
+              <div><span style={styles.label2}>Verified name:</span> {phoneStatus.verified_name ?? "—"}</div>
+              <div>
+                <span style={styles.label2}>Display name status:</span>{" "}
+                <span style={{ color: nameStatusColor(phoneStatus.name_status), fontWeight: "bold" }}>
+                  {phoneStatus.name_status ?? "—"}
+                </span>
+              </div>
+              <div>
+                <span style={styles.label2}>Quality rating:</span>{" "}
+                <span style={{ color: qualityColor(phoneStatus.quality_rating) }}>
+                  {phoneStatus.quality_rating ?? "—"}
+                </span>
+              </div>
+              <div><span style={styles.label2}>Status:</span> {phoneStatus.status ?? "—"}</div>
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── Send form ── */}
       <section style={styles.card}>
@@ -144,6 +189,23 @@ export default function Home() {
   );
 }
 
+function nameStatusColor(status) {
+  if (!status) return "#888";
+  if (status === "APPROVED") return "#4a4";
+  if (status === "AVAILABLE_WITHOUT_REVIEW") return "#4a4";
+  if (status === "PENDING_REVIEW") return "#fa0";
+  if (status === "DECLINED") return "#f66";
+  return "#888";
+}
+
+function qualityColor(rating) {
+  if (!rating) return "#888";
+  if (rating === "GREEN") return "#4a4";
+  if (rating === "YELLOW") return "#fa0";
+  if (rating === "RED") return "#f66";
+  return "#888";
+}
+
 const styles = {
   page: {
     fontFamily: "monospace",
@@ -165,6 +227,7 @@ const styles = {
   },
   form: { display: "flex", flexDirection: "column", gap: 12 },
   label: { display: "flex", flexDirection: "column", gap: 4, fontSize: 13 },
+  label2: { color: "#888", marginRight: 6 },
   input: {
     background: "#222",
     border: "1px solid #444",

@@ -38,7 +38,11 @@ async function sendReply(to, message) {
     }),
   });
   const data = await res.json();
-  console.log("[webhook] Auto-reply result:", data);
+  if (data.error) {
+    console.error("[webhook] Auto-reply failed — code:", data.error.code, "message:", data.error.message, "full:", JSON.stringify(data.error));
+  } else {
+    console.log("[webhook] Auto-reply sent OK:", data);
+  }
 }
 
 // POST — incoming messages from Meta
