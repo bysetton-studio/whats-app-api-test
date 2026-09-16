@@ -17,8 +17,24 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
+// Fetches a random GIF MP4 URL from Giphy. Returns null if unavailable.
+async function fetchRandomGif() {
+  const apiKey = process.env.GIPHY_API_KEY;
+  if (!apiKey) return null;
+  try {
+    const res = await fetch(
+      `https://api.giphy.com/v1/gifs/random?api_key=${apiKey}&rating=g`
+    );
+    const data = await res.json();
+    return data.data?.images?.original_mp4?.mp4 ?? null;
+  } catch (err) {
+    console.warn("[webhook] Giphy fetch failed:", err.message);
+    return null;
+  }
+}
+
 // Returns the error object if the reply failed, or null on success.
-async function sendReply(to, message) {
+async function sendReply(to) {
   const phoneNumberId = process.env.PHONE_NUMBER_ID;
   const accessToken = process.env.ACCESS_TOKEN;
   if (!phoneNumberId || !accessToken) {
@@ -26,18 +42,35 @@ async function sendReply(to, message) {
     console.warn("[webhook] Cannot send reply —", err.message);
     return err;
   }
+
+  const gifUrl = await fetchRandomGif();
+
+  let payload;
+  if (gifUrl) {
+    console.log("[webhook] Replying with GIF:", gifUrl);
+    payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "video",
+      video: { link: gifUrl },
+    };
+  } else {
+    console.log("[webhook] No GIF available, falling back to text reply");
+    payload = {
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body: "Thanks for replying, send us another message please" },
+    };
+  }
+
   const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({
-      messaging_product: "whatsapp",
-      to,
-      type: "text",
-      text: { body: message },
-    }),
+    body: JSON.stringify(payload),
   });
   const data = await res.json();
   if (data.error) {
@@ -78,7 +111,7 @@ export async function POST(request) {
     for (const change of entry?.changes ?? []) {
       const value = change?.value ?? {};
       for (const msg of value?.messages ?? []) {
-        const replyError = await sendReply(msg.from, "Thanks for replying, send us another message please");
+        const replyError = await sendReply(msg.from);
         const parsed = {
           id: msg.id,
           from: msg.from,
