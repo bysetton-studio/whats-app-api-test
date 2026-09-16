@@ -17,12 +17,14 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
+// Returns the error object if the reply failed, or null on success.
 async function sendReply(to, message) {
   const phoneNumberId = process.env.PHONE_NUMBER_ID;
   const accessToken = process.env.ACCESS_TOKEN;
   if (!phoneNumberId || !accessToken) {
-    console.warn("[webhook] Cannot send reply — PHONE_NUMBER_ID or ACCESS_TOKEN not set");
-    return;
+    const err = { message: "PHONE_NUMBER_ID or ACCESS_TOKEN not set" };
+    console.warn("[webhook] Cannot send reply —", err.message);
+    return err;
   }
   const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
     method: "POST",
@@ -40,9 +42,10 @@ async function sendReply(to, message) {
   const data = await res.json();
   if (data.error) {
     console.error("[webhook] Auto-reply failed — code:", data.error.code, "message:", data.error.message, "full:", JSON.stringify(data.error));
-  } else {
-    console.log("[webhook] Auto-reply sent OK:", data);
+    return data.error;
   }
+  console.log("[webhook] Auto-reply sent OK:", data);
+  return null;
 }
 
 // POST — incoming messages from Meta
@@ -75,6 +78,7 @@ export async function POST(request) {
     for (const change of entry?.changes ?? []) {
       const value = change?.value ?? {};
       for (const msg of value?.messages ?? []) {
+        const replyError = await sendReply(msg.from, "Thanks for replying, send us another message please");
         const parsed = {
           id: msg.id,
           from: msg.from,
@@ -83,10 +87,10 @@ export async function POST(request) {
           text: msg.text?.body ?? null,
           raw: msg,
           receivedAt: Date.now(),
+          replyError: replyError ?? null,
         };
         console.log("[webhook] Received message:", parsed);
         await pushMessage(parsed);
-        await sendReply(msg.from, "Thanks for replying, send us another message please");
       }
     }
   }

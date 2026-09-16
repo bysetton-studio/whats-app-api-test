@@ -162,28 +162,36 @@ export default function Home() {
           <p style={styles.empty}>No messages yet. Send something to your WhatsApp number.</p>
         )}
 
-        {messages.map((msg, i) => (
-          <div key={msg.id ?? i} style={styles.msgCard}>
-            <div style={styles.msgMeta}>
-              <span>
-                <strong>From:</strong> {msg.from}
-              </span>
-              <span>
-                <strong>Type:</strong> {msg.type}
-              </span>
-              <span style={styles.ts}>
-                {msg.receivedAt
-                  ? new Date(Number(msg.receivedAt)).toLocaleTimeString()
-                  : new Date(Number(msg.timestamp) * 1000).toLocaleTimeString()}
-              </span>
-            </div>
-            {msg.text && <div style={styles.msgText}>{msg.text}</div>}
-            <details style={styles.details}>
-              <summary>Raw payload</summary>
-              <pre style={styles.pre}>{JSON.stringify(msg.raw, null, 2)}</pre>
+        <div style={styles.msgFeed}>
+          {messages.map((msg, i) => (
+            <details key={msg.id ?? i} style={styles.msgCard}>
+              <summary style={styles.msgSummary}>
+                <span style={styles.msgMeta}>
+                  <span><strong>From:</strong> {msg.from}</span>
+                  <span><strong>Type:</strong> {msg.type}</span>
+                  {msg.text && <span style={styles.msgPreview}>{msg.text}</span>}
+                  {msg.replyError && <span style={styles.replyErrorBadge}>reply failed</span>}
+                  <span style={styles.ts}>
+                    {msg.receivedAt
+                      ? new Date(Number(msg.receivedAt)).toLocaleTimeString()
+                      : new Date(Number(msg.timestamp) * 1000).toLocaleTimeString()}
+                  </span>
+                </span>
+              </summary>
+              <div style={styles.msgBody}>
+                {msg.text && <div style={styles.msgText}>{msg.text}</div>}
+                {msg.replyError && (
+                  <div style={styles.replyError}>
+                    <strong>Auto-reply failed</strong>
+                    {msg.replyError.code ? ` — code ${msg.replyError.code}: ` : ": "}
+                    {msg.replyError.message ?? JSON.stringify(msg.replyError)}
+                  </div>
+                )}
+                <pre style={styles.pre}>{JSON.stringify(msg.raw, null, 2)}</pre>
+              </div>
             </details>
-          </div>
-        ))}
+          ))}
+        </div>
       </section>
     </div>
   );
@@ -274,22 +282,48 @@ const styles = {
     marginLeft: 8,
   },
   empty: { color: "#666", fontSize: 13 },
+  msgFeed: {
+    maxHeight: 480,
+    overflowY: "auto",
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
   msgCard: {
     border: "1px solid #2a2a2a",
     borderRadius: 4,
-    padding: 12,
-    marginBottom: 10,
     background: "#1a1a1a",
+    cursor: "pointer",
+  },
+  msgSummary: {
+    listStyle: "none",
+    padding: "10px 12px",
+    userSelect: "none",
   },
   msgMeta: {
     display: "flex",
-    gap: 16,
+    gap: 12,
     fontSize: 12,
     color: "#999",
-    marginBottom: 6,
     flexWrap: "wrap",
+    alignItems: "center",
+  },
+  msgPreview: {
+    color: "#ccc",
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    maxWidth: 180,
+  },
+  replyErrorBadge: {
+    color: "#f66",
+    fontSize: 11,
+    border: "1px solid #f66",
+    borderRadius: 3,
+    padding: "1px 5px",
   },
   ts: { marginLeft: "auto" },
-  msgText: { fontSize: 14, color: "#e8e8e8", marginBottom: 6 },
-  details: { fontSize: 12, color: "#888", cursor: "pointer" },
+  msgBody: { padding: "0 12px 12px", borderTop: "1px solid #2a2a2a" },
+  msgText: { fontSize: 14, color: "#e8e8e8", margin: "10px 0 6px" },
+  replyError: { fontSize: 12, color: "#f66", marginBottom: 6, padding: "4px 8px", background: "#1a0000", borderRadius: 3 },
 };
