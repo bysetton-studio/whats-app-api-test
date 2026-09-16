@@ -17,6 +17,30 @@ export async function GET(request) {
   return new Response("Forbidden", { status: 403 });
 }
 
+async function sendReply(to, message) {
+  const phoneNumberId = process.env.PHONE_NUMBER_ID;
+  const accessToken = process.env.ACCESS_TOKEN;
+  if (!phoneNumberId || !accessToken) {
+    console.warn("[webhook] Cannot send reply — PHONE_NUMBER_ID or ACCESS_TOKEN not set");
+    return;
+  }
+  const res = await fetch(`https://graph.facebook.com/v21.0/${phoneNumberId}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      messaging_product: "whatsapp",
+      to,
+      type: "text",
+      text: { body: message },
+    }),
+  });
+  const data = await res.json();
+  console.log("[webhook] Auto-reply result:", data);
+}
+
 // POST — incoming messages from Meta
 export async function POST(request) {
   const rawBody = await request.text();
@@ -58,6 +82,7 @@ export async function POST(request) {
         };
         console.log("[webhook] Received message:", parsed);
         await pushMessage(parsed);
+        await sendReply(msg.from, "Thanks for replying, send us another message please");
       }
     }
   }

@@ -115,8 +115,8 @@ export default function Home() {
               </span>
               <span style={styles.ts}>
                 {msg.receivedAt
-                  ? new Date(msg.receivedAt).toLocaleTimeString()
-                  : msg.timestamp}
+                  ? new Date(Number(msg.receivedAt)).toLocaleTimeString()
+                  : new Date(Number(msg.timestamp) * 1000).toLocaleTimeString()}
               </span>
             </div>
             {msg.text && <div style={styles.msgText}>{msg.text}</div>}
